@@ -34,9 +34,25 @@ fi
 # The exchange doubles as the reachability probe: an unattached proxy answers
 # with a non-JSON error page, so jq needs its own redirect (in a pipeline the
 # 2>/dev/null binds to curl alone).
-token=$(curl -sL --connect-timeout 5 --max-time 20 -X POST \
-  -d "grant_type=client_credentials" "$PROXY/api/v2/oauth/token" 2>/dev/null \
-  | jq -r '.access_token // empty' 2>/dev/null)
+#
+# RETRY, because this runs at boot and the two failure modes are
+# indistinguishable from one attempt:
+#   - genuinely unattached      -> correct to give up, VM stays off the tailnet
+#   - attached but not ready yet -> exe.dev's integration plumbing is eventually
+#                                   consistent on first use (the same reason
+#                                   new-dev-vm retries repo clones), and giving
+#                                   up here strands the VM until someone reboots
+#                                   it by hand
+# Six tries over ~2.5 min costs nothing on an unattached VM and rescues the
+# common case where the edge is still wiring up on first boot.
+token=""
+for attempt in 1 2 3 4 5 6; do
+  token=$(curl -sL --connect-timeout 5 --max-time 20 -X POST \
+    -d "grant_type=client_credentials" "$PROXY/api/v2/oauth/token" 2>/dev/null \
+    | jq -r '.access_token // empty' 2>/dev/null)
+  [[ -n $token ]] && break
+  [[ $attempt -lt 6 ]] && sleep 30
+done
 
 if [[ -z $token ]]; then
   echo "api-tailscale not attached; staying off the tailnet"

@@ -3,9 +3,18 @@ Description=IV: join the tailnet if api-tailscale is attached
 After=network-online.target tailscaled.service
 Wants=network-online.target
 Requires=tailscaled.service
-# Joined already? The script is idempotent, but skipping the unit entirely keeps
-# a reboot from touching tailnet state at all.
-ConditionPathExists=!/var/lib/tailscale/tailscaled.state
+# NO ConditionPathExists on tailscaled.state. It was here to skip the unit on an
+# already-joined VM, and it silently disabled the join entirely: tailscaled
+# writes that file at DAEMON STARTUP, not at join -- 2 bytes, an empty `{}` --
+# and this unit is After=tailscaled.service, so the condition was already false
+# every time systemd evaluated it. Measured on rss-feed-next 2026-08-23:
+# "Condition: start condition unmet ... ConditionPathExists=!/var/lib/tailscale/
+# tailscaled.state was not met", with the integration correctly attached and the
+# VM never joining across two boots.
+#
+# The guard was redundant anyway: iv-tailnet-join's first action is a
+# `tailscale status` check that exits 0 when already a member. Idempotency lives
+# in the script, where it can test the thing it actually cares about.
 
 [Service]
 Type=oneshot
