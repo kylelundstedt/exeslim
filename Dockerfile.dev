@@ -63,6 +63,23 @@ FROM ${BASE}
 
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
+# --- undo the base's prod-lane tailnet join ------------------------------------
+# The base enables iv-tailnet-join.service, which joins as tag:prod. This image
+# is the DEV lane: provision-iv.sh joins these VMs as tag:dev, and the tailnet
+# policy grants dev -> prod on :22 while granting prod NOTHING in return.
+#
+# Inherited unchanged, the base unit fires at first boot -- before any
+# provisioning -- and the VM lands in the wrong trust zone. It would look joined,
+# `ssh <vm>` would work from a dev box, and the failure would only surface as
+# that VM being unable to reach its peers. Worse, a dev VM tagged prod is one the
+# policy trusts LESS, so the symptom is confusing rather than obviously broken.
+#
+# tailscaled itself stays enabled: provision-iv.sh needs the daemon running to
+# perform its own tag:dev join, and enabling it does not join anything.
+RUN systemctl disable iv-tailnet-join.service \
+	&& rm -f /etc/systemd/system/iv-tailnet-join.service \
+		/usr/local/bin/iv-tailnet-join
+
 #   libyaml-0-2  apex links against libyaml-0.so.2. exeuntu has it; exeslim does
 #                not, so `apex --version` died with "error while loading shared
 #                libraries" AFTER its checksum passed — provisioning reported the
