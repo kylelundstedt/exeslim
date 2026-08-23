@@ -66,16 +66,31 @@ auth_config=$(mktemp)
 chmod 600 "$auth_config"
 printf 'header = "Authorization: Bearer %s"\n' "$token" > "$auth_config"
 
-key=$(curl --config "$auth_config" -sL --max-time 30 -X POST \
+mint=$(curl --config "$auth_config" -sL --max-time 30 -X POST \
   "$TS_API/api/v2/tailnet/-/keys" -H "Content-Type: application/json" \
   -d "{\"capabilities\":{\"devices\":{\"create\":{\"reusable\":false,\"ephemeral\":true,\"preauthorized\":true,\"tags\":[\"$TAG\"]}}}}" \
-  2>/dev/null | jq -r '.key // empty' 2>/dev/null)
+  2>/dev/null)
 rm -f "$auth_config"
+key=$(jq -r '.key // empty' <<<"$mint" 2>/dev/null)
 
 if [[ -z $key ]]; then
-  # Most likely cause: the OAuth client backing api-tailscale is not scoped to
-  # mint keys for this tag. Its scope is echoed by the token endpoint.
-  echo "could not mint a $TAG auth key -- check the OAuth client's auth_keys scope" >&2
+  # PRINT WHAT THE API SAID, never a guess about why.
+  #
+  # This line used to read "check the OAuth client's auth_keys scope". The scope
+  # was correct and the real message was
+  #
+  #   requested tags [tag:dev] are invalid or not permitted
+  #
+  # which is about tag OWNERSHIP, not scope: an OAuth client is its own identity
+  # in Tailscale, so holding a tag is not enough -- tagOwners must list the tag
+  # as an owner of ITSELF before a client may apply it. The hardcoded guess sent
+  # two people to re-verify a setting that was already right, twice, and cost
+  # most of a debugging cycle (2026-08-23). The API had the answer the whole
+  # time; the script was throwing it away.
+  echo "could not mint a $TAG auth key. Tailscale said:" >&2
+  jq -r '.message // "(no message; raw response below)"' <<<"$mint" 2>/dev/null >&2 \
+    || printf '%s\n' "$mint" >&2
+  echo "hint: if this mentions tags, check tagOwners lists \"$TAG\" as an owner of itself" >&2
   exit 1
 fi
 
