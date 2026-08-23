@@ -119,6 +119,38 @@ COPY exe-setup.service /etc/systemd/system/exe-setup.service
 RUN chmod 644 /etc/systemd/system/exe-setup.service \
 	&& systemctl enable exe-setup.service
 
+# --- in-place OS patching -----------------------------------------------------
+# apt-daily.timer and unattended-upgrades are masked above (they fight the
+# platform), so WITHOUT this a VM on this base is never patched at all: its
+# userspace is frozen at the image build date for as long as the VM lives.
+#
+# On dev VMs provision-iv.sh installs exactly these two units, which is why the
+# gap was invisible -- every VM anyone looked at had them. Deployment-lane VMs
+# never run that script, by design, and nothing replaced it. rss-feed was found
+# 2026-08-23 live and internet-facing (public_proxy: true) on a 2026-07-28 image
+# with no timer, no tailnet and no toolchain -- unpatched for 26 days and
+# outside every fleet check, because fleet-patch-status filters on tag:mcp-agent
+# and agentsview-coverage excludes it explicitly. Both exclusions are correct on
+# their own; together they left nothing watching.
+#
+# Shipping the units in the IMAGE rather than a provisioning script is the point:
+# the deployment lane has no git, no python and no agent, so anything that has to
+# be installed onto it later is something a human has to remember. This needs
+# nothing but apt, which is present.
+#
+# provision-iv.sh writes byte-identical units on dev VMs and enables the same
+# timer name, so a dev VM inheriting these from the base is a no-op rather than a
+# conflict.
+#
+# No automatic reboot. The kernel belongs to the host on a container-as-VM, so
+# kernel packages are not the point; userspace CVEs are, and those take effect on
+# the next process start.
+COPY iv-apt-upgrade.service /etc/systemd/system/iv-apt-upgrade.service
+COPY iv-apt-upgrade.timer /etc/systemd/system/iv-apt-upgrade.timer
+RUN chmod 644 /etc/systemd/system/iv-apt-upgrade.service \
+		/etc/systemd/system/iv-apt-upgrade.timer \
+	&& systemctl enable iv-apt-upgrade.timer
+
 # --- exedev user -------------------------------------------------------------
 # Rename the stock ubuntu user (uid 1000) rather than delete/recreate, so uid,
 # gid, home and subuid/subgid ranges all line up with exeuntu.
