@@ -35,6 +35,8 @@ RUN apt-get update \
 		# 0.0.0.0:8000 (proxy can reach it) vs 127.0.0.1:8000 (it cannot).
 		iproute2 \
 		sudo tzdata locales \
+		# jq for iv-tailnet-join below (~1 MB). curl is already here.
+		jq \
 	# en_US + en_GB only; exeuntu installs locales-all, which is ~200 MB.
 	# en_US.UTF-8 is the default as the least surprising for anyone else who
 	# lands on the box. See the ENV LANG note below for how to override.
@@ -150,6 +152,40 @@ COPY iv-apt-upgrade.timer /etc/systemd/system/iv-apt-upgrade.timer
 RUN chmod 644 /etc/systemd/system/iv-apt-upgrade.service \
 		/etc/systemd/system/iv-apt-upgrade.timer \
 	&& systemctl enable iv-apt-upgrade.timer
+
+# --- tailnet ------------------------------------------------------------------
+# The prod lane has no provisioner -- no git, no python, no agent -- so a VM here
+# is reachable only over the exe.dev edge, which requires the ACCOUNT OWNER's SSH
+# key. No fleet VM has one (deliberately: the control-plane escalation probe
+# asserts it), so nothing on the fleet can inspect a prod VM at all. That is how
+# rss-feed sat 26 days unpatched with every check green -- the checks that would
+# have caught it could not reach it.
+#
+# Installing the client here does NOT join the tailnet. iv-tailnet-join is gated
+# on the `api-tailscale` integration being attached, a decision made off-VM in
+# the control plane -- the same consent signal provision-iv.sh uses on dev VMs.
+# Unattached, the unit exits 0 having done nothing.
+#
+# Explicitly NOT the v2.0.0 auto-join that was removed: that joined every VM
+# unconditionally from baked-in image code. The gate is the whole difference.
+#
+# ~30 MB on a ~268 MB image. Priced against an internet-facing box that nothing
+# can verify, that is worth it.
+RUN curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg" \
+		-o /usr/share/keyrings/tailscale-archive-keyring.gpg \
+	&& printf 'deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu noble main\n' \
+		>/etc/apt/sources.list.d/tailscale.list \
+	&& apt-get update \
+	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tailscale \
+	&& apt-get clean \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& systemctl enable tailscaled
+
+COPY iv-tailnet-join.sh /usr/local/bin/iv-tailnet-join
+COPY iv-tailnet-join.service /etc/systemd/system/iv-tailnet-join.service
+RUN chmod 755 /usr/local/bin/iv-tailnet-join \
+	&& chmod 644 /etc/systemd/system/iv-tailnet-join.service \
+	&& systemctl enable iv-tailnet-join.service
 
 # --- exedev user -------------------------------------------------------------
 # Rename the stock ubuntu user (uid 1000) rather than delete/recreate, so uid,

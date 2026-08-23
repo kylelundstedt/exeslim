@@ -1,0 +1,16 @@
+[Unit]
+Description=IV: join the tailnet if api-tailscale is attached
+After=network-online.target tailscaled.service
+Wants=network-online.target
+Requires=tailscaled.service
+# Joined already? The script is idempotent, but skipping the unit entirely keeps
+# a reboot from touching tailnet state at all.
+ConditionPathExists=!/var/lib/tailscale/tailscaled.state
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/iv-tailnet-join
+
+[Install]
+WantedBy=multi-user.target
