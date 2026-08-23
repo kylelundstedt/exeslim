@@ -1,0 +1,13 @@
+[Unit]
+Description=IV: daily in-place OS patching
+
+[Timer]
+OnCalendar=daily
+# Persistent so a VM that was stopped catches up on next boot rather than
+# silently skipping its window; randomised so the fleet does not hit the
+# mirrors in lockstep.
+Persistent=true
+RandomizedDelaySec=2h
+
+[Install]
+WantedBy=timers.target

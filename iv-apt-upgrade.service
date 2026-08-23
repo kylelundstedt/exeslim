@@ -1,0 +1,13 @@
+[Unit]
+Description=IV: apt update + upgrade (in-place OS patching)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=DEBIAN_FRONTEND=noninteractive
+# --force-confold/confdef: never prompt, and never silently replace a config we
+# manage. An interactive prompt in a timer unit hangs forever.
+ExecStart=/usr/bin/apt-get update -qq
+ExecStart=/usr/bin/apt-get -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef upgrade
+ExecStart=/usr/bin/apt-get -y autoremove
