@@ -202,9 +202,32 @@ RUN usermod -l exedev -c "exe.dev user" ubuntu \
 	&& mkdir -p /var/lib/systemd/linger \
 	&& touch /var/lib/systemd/linger/exedev
 
+# PATH goes at the TOP of .bashrc, not the end, and that placement is the whole
+# point of this stanza.
+#
+# `ssh vm 'cmd'` is a non-interactive shell. It does not read .profile at all --
+# only bash's special case for a network connection, which reads .bashrc. And
+# Ubuntu's skel .bashrc opens with
+#
+#     case $- in *i*) ;; *) return;; esac
+#
+# so anything APPENDED to it is dead code for exactly the callers that matter:
+# `ssh vm 'cmd'`, scp-then-run deploys, CI, and any agent driving the box
+# non-interactively. Appending was the original form here, and it hid for months
+# because the older base shipped zsh, whose .zshenv is read on EVERY invocation.
+# When the shell became bash the guard started swallowing the export, and
+# `ssh vm 'render-md-site ...'` failed with "/usr/bin/env: 'python3': No such
+# file or directory" on a VM where python3 was installed and on an interactive
+# PATH -- the confusing shape of the bug is why the comment is this long.
+#
+# Prepending puts it before the guard, so it applies to interactive and
+# non-interactive shells alike. .profile keeps its own copy for login shells
+# that never source .bashrc (`ssh vm` with no command, some su/cron paths).
 RUN printf 'export PATH="$HOME/.local/bin:$PATH"\nexport XDG_RUNTIME_DIR="/run/user/$(id -u)"\n' \
-		>>/home/exedev/.bashrc \
-	&& printf 'export XDG_RUNTIME_DIR="/run/user/$(id -u)"\n' >>/home/exedev/.profile \
+		| cat - /home/exedev/.bashrc >/tmp/bashrc.new \
+	&& mv /tmp/bashrc.new /home/exedev/.bashrc \
+	&& printf 'export PATH="$HOME/.local/bin:$PATH"\nexport XDG_RUNTIME_DIR="/run/user/$(id -u)"\n' \
+		>>/home/exedev/.profile \
 	&& rm -rf /etc/update-motd.d/* /etc/motd \
 	&& touch /home/exedev/.hushlogin \
 	&& chown exedev:exedev /home/exedev/.hushlogin /home/exedev/.bashrc /home/exedev/.profile

@@ -33,9 +33,27 @@ owns is edited except one line:
 - `shelley.socket`, `shelley.service` — the label installs the Shelley binary but
   does not run it; a custom image must supply its own units. Written against
   `shelley serve -h` rather than copied from exeuntu.
+- `Dockerfile` — three additions, all of which upstream may well want:
+  `jq` (for `iv-tailnet-join`), the `iv-apt-upgrade` timer/service so a
+  deployment-lane VM is patched at all, and the `.bashrc` PATH fix below.
 - This file.
 
-Everything upstream owns — `Dockerfile`, `init`, `exe-setup.service`,
+### The `.bashrc` PATH placement
+
+Upstream appends the `~/.local/bin` PATH export to the END of `.bashrc`. Ubuntu's
+skel `.bashrc` opens with `case $- in *i*) ;; *) return;; esac`, so an appended
+export is dead code for every non-interactive shell — which is to say for
+`ssh vm 'cmd'`, scp-then-run deploys, CI, and agents driving the box. We prepend
+instead, and add the export to `.profile` too.
+
+This surfaced as `ssh iv-cli 'provision-docsite ~/iv-cli'` failing with
+`/usr/bin/env: 'python3': No such file or directory` on a VM where python3 was
+installed and worked fine interactively. It hid for months because the older
+base shipped zsh, whose `.zshenv` is read on every invocation; the bug only
+became reachable when the shell became bash. **Worth offering upstream** — it is
+not fork-specific.
+
+Everything else upstream owns — `init`, `exe-setup.service`,
 `tmpfiles-tmp.conf`, `renovate.json` — is unmodified. Verify with
 `git diff upstream/main --stat`: every path listed there should be one of the
 above.
