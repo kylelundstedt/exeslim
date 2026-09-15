@@ -59,6 +59,18 @@ if [[ -z $token ]]; then
   exit 0
 fi
 
+# NON-EPHEMERAL, on purpose (2026-09-15). A deployment target is a long-lived
+# appliance: an ephemeral node is reaped after a long enough outage, and then
+# the only way back is this unit -- which needs api-tailscale attached again.
+# That dependency is what kept the integration as a STANDING grant on
+# internet-facing VMs (the 2026-07-28 remediation had removed exactly that).
+# A persistent node survives reboots and outages with no API access at all, so
+# the grant can be time-boxed to the first boot (`integrations attach
+# api-tailscale vm:<vm> --for 30m`) and lapse. The cost moves to retirement:
+# delete the node explicitly (iv-provision retiring.md section 5), or the next
+# VM of the same name joins as <name>-1. The key itself is one-use and expires
+# in 10 minutes if unused, so a failed boot leaves nothing behind.
+#
 # Keep the bearer token out of the process table and off any shell history:
 # curl --config reads it from a 0600 file instead of argv.
 trap 'rm -f "${auth_config:-}"; unset token key' EXIT
@@ -68,7 +80,7 @@ printf 'header = "Authorization: Bearer %s"\n' "$token" > "$auth_config"
 
 mint=$(curl --config "$auth_config" -sL --max-time 30 -X POST \
   "$TS_API/api/v2/tailnet/-/keys" -H "Content-Type: application/json" \
-  -d "{\"capabilities\":{\"devices\":{\"create\":{\"reusable\":false,\"ephemeral\":true,\"preauthorized\":true,\"tags\":[\"$TAG\"]}}}}" \
+  -d "{\"capabilities\":{\"devices\":{\"create\":{\"reusable\":false,\"ephemeral\":false,\"preauthorized\":true,\"tags\":[\"$TAG\"]}}},\"expirySeconds\":600}" \
   2>/dev/null)
 rm -f "$auth_config"
 key=$(jq -r '.key // empty' <<<"$mint" 2>/dev/null)

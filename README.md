@@ -195,6 +195,22 @@ ssh exe.dev new --name=my-service \
 
 ### Notes
 
+**Tailnet (deployment lane).** `iv-tailnet-join.service` runs at first boot and
+joins as `tag:prod` **iff** the `api-tailscale` exe.dev integration is
+attached; unattached it exits 0. Do not carry that attachment as a standing
+grant on an internet-facing VM — time-box it to the first boot instead:
+
+```
+ssh exe.dev new --name=<vm> --image=ghcr.io/kylelundstedt/exeslim:<tag>
+ssh exe.dev integrations attach api-tailscale vm:<vm> --for 30m   # the unit retries ~2.5 min
+```
+
+Nodes are minted **non-ephemeral** (since 2026-09-15), so after that window the
+VM never touches the Tailscale API again; reboots and outages keep the node.
+Retiring a VM therefore means deleting its node too (iv-provision
+`retiring.md` §5). To join as something other than `tag:prod`, set
+`IV_TAILSCALE_TAG` via a drop-in on the unit; nothing sets it at boot.
+
 The package is public, so no `--registry-auth` is needed. If you fork this and
 keep the package private, pass a token with `read:packages`:
 
