@@ -38,6 +38,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # arm64 is built under QEMU on the amd64 runner. exe.dev pulls amd64;
+      # arm64 is for Apple container machines on Apple Silicon. Both platforms
+      # are published under every tag as one image index.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+        with:
+          platforms: arm64
+
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # Skipped on PRs: nothing is pushed there, and a fork PR only ever gets a
@@ -69,7 +76,7 @@ jobs:
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           # PRs build only — validation without publishing.
           push: ${{ github.event_name != 'pull_request' }}
           # Overrides the "24.04" version label inherited from ubuntu:24.04.
@@ -88,8 +95,9 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/exeslim:${{ steps.tag.outputs.build }}
             ghcr.io/${{ github.repository_owner }}/exeslim:${{ github.sha }}
           # exe.dev reads image metadata (Cmd, Labels, ExposedPorts) directly.
-          # Provenance/SBOM turn the push into an attestation manifest list,
-          # which can hide that metadata from a plain OCI pull.
+          # Provenance/SBOM add attestation entries to the image index, which
+          # can hide that metadata from a plain OCI pull. The index itself now
+          # holds only the two platform manifests.
           provenance: false
           sbom: false
 
@@ -105,7 +113,7 @@ jobs:
         with:
           context: .
           file: Dockerfile.dev
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
             BASE=ghcr.io/${{ github.repository_owner }}/exeslim:${{ steps.tag.outputs.build }}
