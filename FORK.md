@@ -10,9 +10,8 @@ control, rebuilt weekly by an Action we do not control. Owning the build is
 worth the small maintenance cost, and it matches the dotfiles convention that
 GitHub under `kylelundstedt` is the canonical source of truth.
 
-Rationale, measurements, and the deployment-lane plan live in
-[`kylelundstedt/dotfiles`](https://github.com/kylelundstedt/dotfiles) →
-`agent_docs/vm-disk-weight.md`.
+Rationale, measurements, and the deployment-lane plan are in the private
+`kylelundstedt/dotfiles` repo, `agent_docs/vm-disk-weight.md`.
 
 ## Divergence from upstream
 
