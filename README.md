@@ -130,7 +130,7 @@ below is platform wiring that exe.dev depends on, and is reproduced here:
 
 | Platform requirement | Why it matters |
 |---|---|
-| `/etc/fstab` with `x-systemd.growfs` on `/dev/vda` | Without it `systemd-growfs@-.service` never runs, so `--disk=50GB` or `resize` boots with an **unexpanded root filesystem**. `/dev/vda` confirmed as the real root device on live VMs. |
+| `/etc/fstab` with `x-systemd.growfs` on `/dev/vda` | Without it `systemd-growfs@-.service` never runs, so `--disk=50GB` or `resize` boots with an **unexpanded root filesystem**. `/dev/vda` confirmed as the real root device on live VMs. A drop-in skips `systemd-growfs-root` when systemd detects a container (Apple container machines, which cannot resize online); exe.dev VMs report `kvm` and still grow. |
 | `exe-setup.service` | Runs `/exe.dev/setup` on every boot, not only the first. Without it `new --setup-script` is accepted and silently does nothing. |
 | `CMD` file named exactly `init` | exe.dev's exetini decides a wrapper is an init *from the basename*, and execs rather than forks it. |
 | `EXPOSE 8000` | Sets the default proxy port. With no `EXPOSE`, exe.dev defaults to `:80`. |
