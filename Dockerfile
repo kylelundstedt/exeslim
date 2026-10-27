@@ -111,6 +111,14 @@ RUN systemctl mask -- \
 # filesystem stays at its original size when the disk is grown — so
 # `new --disk=50GB` or `resize` silently gives you an unexpanded fs.
 RUN echo '/dev/vda / ext4 defaults,x-systemd.growfs 0 1' >/etc/fstab
+# ...except where systemd sees a container. On an Apple container machine
+# (arm64 image) systemd-detect-virt says `container-other`, root is a sparse
+# disk already at full size, and the kernel refuses online ext4 resize
+# ("Operation not supported"), so the unit fails and the system boots
+# `degraded`. exe.dev VMs report `kvm`, so they still grow.
+RUN mkdir -p /etc/systemd/system/systemd-growfs-root.service.d \
+	&& printf '[Unit]\nConditionVirtualization=!container\n' \
+		>/etc/systemd/system/systemd-growfs-root.service.d/10-not-in-container.conf
 
 # Stop systemd wiping /tmp at boot; it races non-systemd users that run at boot.
 COPY tmpfiles-tmp.conf /etc/tmpfiles.d/tmp.conf
