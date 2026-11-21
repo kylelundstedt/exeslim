@@ -33,7 +33,7 @@ owns is edited except one line:
   does not run it; a custom image must supply its own units. Written against
   `shelley serve -h` rather than copied from exeuntu.
 - `Dockerfile` — three additions, all of which upstream may well want:
-  `jq` (for `iv-tailnet-join`), the `iv-apt-upgrade` timer/service so a
+  `jq` (for the tailnet join setup script), the `iv-apt-upgrade` timer/service so a
   deployment-lane VM is patched at all, and the `.bashrc` PATH fix below.
 - This file.
 

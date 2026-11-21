@@ -35,7 +35,7 @@ RUN apt-get update \
 		# 0.0.0.0:8000 (proxy can reach it) vs 127.0.0.1:8000 (it cannot).
 		iproute2 \
 		sudo tzdata locales \
-		# jq for iv-tailnet-join below (~1 MB). curl is already here.
+		# jq for the tailnet join setup script (~1 MB). curl is already here.
 		jq \
 	# en_US + en_GB only; exeuntu installs locales-all, which is ~200 MB.
 	# en_US.UTF-8 is the default as the least surprising for anyone else who
@@ -169,10 +169,10 @@ RUN chmod 644 /etc/systemd/system/iv-apt-upgrade.service \
 # rss-feed sat 26 days unpatched with every check green -- the checks that would
 # have caught it could not reach it.
 #
-# Installing the client here does NOT join the tailnet. iv-tailnet-join is gated
-# on the `api-tailscale` integration being attached, a decision made off-VM in
-# the control plane -- the same consent signal provision-iv.sh uses on dev VMs.
-# Unattached, the unit exits 0 having done nothing.
+# Installing the client here does NOT join the tailnet. A VM joins only when it
+# is created with an exe.dev setup script that federates through a Tailscale
+# workload identity integration attached to its exe.dev tag (iv-infra
+# exe-dev/new-vm/join.sh). Without that attachment it stays off the tailnet.
 #
 # Explicitly NOT the v2.0.0 auto-join that was removed: that joined every VM
 # unconditionally from baked-in image code. The gate is the whole difference.
@@ -188,12 +188,6 @@ RUN curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg" \
 	&& apt-get clean \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& systemctl enable tailscaled
-
-COPY iv-tailnet-join.sh /usr/local/bin/iv-tailnet-join
-COPY iv-tailnet-join.service /etc/systemd/system/iv-tailnet-join.service
-RUN chmod 755 /usr/local/bin/iv-tailnet-join \
-	&& chmod 644 /etc/systemd/system/iv-tailnet-join.service \
-	&& systemctl enable iv-tailnet-join.service
 
 # --- exedev user -------------------------------------------------------------
 # Rename the stock ubuntu user (uid 1000) rather than delete/recreate, so uid,
