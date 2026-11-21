@@ -21,17 +21,10 @@ owns is edited except one line:
 - `.github/workflows/build.yml` — publish tags use
   `ghcr.io/${{ github.repository_owner }}/exeslim` instead of a hardcoded
   `ghcr.io/ryanlewis/exeslim`. Owner-relative, so it is correct in either
-  namespace and is the one change worth offering back upstream. The same job also
-  gained a second build/push step for `exeslim-dev`.
-- `Dockerfile.dev` — the `exeslim-dev` image: exeslim plus the minimum a *dev* VM
-  needs (`git jq unzip libyaml-0-2 openssh-client nginx-light`),
-  `DBUS_SESSION_BUS_ADDRESS`, `EXPOSE 9999`, and
-  `LABEL exe.dev/install-shelley=true`. A separate file rather than edits to
-  `Dockerfile`, so this divergence cannot conflict on an upstream bump, and so the
-  deployment lane keeps a base with no toolchain and no Shelley.
-- `shelley.socket`, `shelley.service` — the label installs the Shelley binary but
-  does not run it; a custom image must supply its own units. Written against
-  `shelley serve -h` rather than copied from exeuntu.
+  namespace and is the one change worth offering back upstream. (A second
+  `exeslim-dev` image, with Shelley and dev tools, was built here until
+  2026-11-21; every VM now uses this one image, and its last tags stay in the
+  registry.)
 - `Dockerfile` — three additions, all of which upstream may well want:
   `jq` (for the tailnet join setup script), the `iv-apt-upgrade` timer/service so a
   deployment-lane VM is patched at all, and the `.bashrc` PATH fix below.
